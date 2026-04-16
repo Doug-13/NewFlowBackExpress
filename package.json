@@ -1,7 +1,7 @@
 {
   "name": "nodeapitsmysql",
   "version": "1.0.0",
-  "description": "",
+  "description": "node_modules\r  .env\r # nano .env (ctrl+O, enter, ctrl+X)\r  PORT = 3000\r # npx tsc --init\r # mkdir src\r # nano src/server.ts\r import express from 'express';\r import dotenv from 'dotenv';",
   "main": "index.js",
   "scripts": {
     "start": "nodemon --exec ts-node src/server.ts"
@@ -18,14 +18,21 @@
   },
   "homepage": "https://github.com/Doug-13/nodeApiTsMysql#readme",
   "dependencies": {
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.5.2",
-    "nodemon": "^3.0.1",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.1.6"
+    "pg": "^8.20.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.17"
+    "@types/bcrypt": "^6.0.0",
+    "@types/express": "^4.17.25",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
   }
 }
