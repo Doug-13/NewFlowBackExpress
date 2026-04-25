@@ -1,14 +1,23 @@
-import { Router } from 'express';
-import processesController from '../controller/processesController';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { Router } from 'express'
+import processesController from '../controller/processesController'
+import { authMiddleware } from '../middleware/authMiddleware'
 
-const router = Router();
+const router = Router()
 
-router.get('/processes', authMiddleware, processesController.findAll);
-router.get('/processes/:id', authMiddleware, processesController.findOne);
-router.post('/processes', authMiddleware, processesController.create);
-router.put('/processes/:id', authMiddleware, processesController.update);
-router.patch('/processes/:id', authMiddleware, processesController.patch);
-router.delete('/processes/:id', authMiddleware, processesController.remove);
+router.get(
+  '/processes',
+  (req, _res, next) => {
+    console.log('[ROUTER] processes hit')
+    next()
+  },
+  authMiddleware,
+  processesController.findAll,
+)
 
-export default router;
+router.get('/processes/:id', authMiddleware, processesController.findOne)
+router.post('/processes', authMiddleware, processesController.create)
+router.put('/processes/:id', authMiddleware, processesController.update)
+router.patch('/processes/:id', authMiddleware, processesController.patch)
+router.delete('/processes/:id', authMiddleware, processesController.remove)
+
+export default router

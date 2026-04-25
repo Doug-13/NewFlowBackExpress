@@ -1,46 +1,62 @@
-import { Router } from 'express';
-import metadataController from '../controller/metadataController';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { Router } from 'express'
+import {
+  getValues,
+  getFieldsByDocumentStep,
+  saveValues,
+  findDefs,
+  createDef,
+  updateDef,
+  patchDef,
+  removeDef,
+  findTableDefinitionsByProcess,
+  findSets,
+  createSet,
+  updateSet,
+  patchSet,
+  removeSet,
+} from '../controller/metadataController'
+import { authMiddleware } from '../middleware/authMiddleware'
 
-const router = Router();
+const router = Router()
 
-// ── Valores por documento ──────────────────────────────────────────────────
-router.get('/metadata/values/:documentId', authMiddleware, metadataController.getValues);
-router.get('/metadataValues/by-document/:documentId', authMiddleware, metadataController.getValues);
+router.get('/metadata/values/:documentId', authMiddleware, getValues)
+router.get('/metadata/form-fields/:documentId', authMiddleware, getFieldsByDocumentStep)
+router.get('/metadataValues/by-document/:documentId', authMiddleware, getValues)
 
-router.post('/metadata/values/:documentId', authMiddleware, metadataController.saveValues);
-router.post('/metadataValues/by-document/:documentId', authMiddleware, metadataController.saveValues);
+router.post('/metadata/values/:documentId', authMiddleware, saveValues)
+router.post('/metadataValues/by-document/:documentId', authMiddleware, saveValues)
 
-// ── Definições ─────────────────────────────────────────────────────────────
-router.get('/metadataDefinitions', authMiddleware, metadataController.findDefs);
-router.get('/metadata/definitions', authMiddleware, metadataController.findDefs);
+router.get('/metadataDefinitions', authMiddleware, findDefs)
+router.get('/metadata/definitions', authMiddleware, findDefs)
 
-router.post('/metadataDefinitions', authMiddleware, metadataController.createDef);
-router.post('/metadata/definitions', authMiddleware, metadataController.createDef);
+router.get('/metadata/table-definitions', authMiddleware, findTableDefinitionsByProcess)
+router.get('/table-definitions', authMiddleware, findTableDefinitionsByProcess)
 
-router.put('/metadataDefinitions/:id', authMiddleware, metadataController.updateDef);
-router.put('/metadata/definitions/:id', authMiddleware, metadataController.updateDef);
+router.post('/metadataDefinitions', authMiddleware, createDef)
+router.post('/metadata/definitions', authMiddleware, createDef)
 
-router.patch('/metadataDefinitions/:id', authMiddleware, metadataController.patchDef);
-router.patch('/metadata/definitions/:id', authMiddleware, metadataController.patchDef);
+router.put('/metadataDefinitions/:id', authMiddleware, updateDef)
+router.put('/metadata/definitions/:id', authMiddleware, updateDef)
 
-router.delete('/metadataDefinitions/:id', authMiddleware, metadataController.removeDef);
-router.delete('/metadata/definitions/:id', authMiddleware, metadataController.removeDef);
+router.patch('/metadataDefinitions/:id', authMiddleware, patchDef)
+router.patch('/metadata/definitions/:id', authMiddleware, patchDef)
 
-// ── Conjuntos ──────────────────────────────────────────────────────────────
-router.get('/metadataSets', authMiddleware, metadataController.findSets);
-router.get('/metadata/sets', authMiddleware, metadataController.findSets);
+router.delete('/metadataDefinitions/:id', authMiddleware, removeDef)
+router.delete('/metadata/definitions/:id', authMiddleware, removeDef)
 
-router.post('/metadataSets', authMiddleware, metadataController.createSet);
-router.post('/metadata/sets', authMiddleware, metadataController.createSet);
+router.get('/metadataSets', authMiddleware, findSets)
+router.get('/metadata/sets', authMiddleware, findSets)
 
-router.put('/metadataSets/:id', authMiddleware, metadataController.updateSet);
-router.put('/metadata/sets/:id', authMiddleware, metadataController.updateSet);
+router.post('/metadataSets', authMiddleware, createSet)
+router.post('/metadata/sets', authMiddleware, createSet)
 
-router.patch('/metadataSets/:id', authMiddleware, metadataController.patchSet);
-router.patch('/metadata/sets/:id', authMiddleware, metadataController.patchSet);
+router.put('/metadataSets/:id', authMiddleware, updateSet)
+router.put('/metadata/sets/:id', authMiddleware, updateSet)
 
-router.delete('/metadataSets/:id', authMiddleware, metadataController.removeSet);
-router.delete('/metadata/sets/:id', authMiddleware, metadataController.removeSet);
+router.patch('/metadataSets/:id', authMiddleware, patchSet)
+router.patch('/metadata/sets/:id', authMiddleware, patchSet)
 
-export default router;
+router.delete('/metadataSets/:id', authMiddleware, removeSet)
+router.delete('/metadata/sets/:id', authMiddleware, removeSet)
+
+export default router

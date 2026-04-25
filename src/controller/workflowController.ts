@@ -26,7 +26,7 @@ async function executeTransition(req: Request, res: Response) {
 
     const historyResult = await db.query(
       `
-      INSERT INTO workflow_history (workflow_instance_id, from_step, to_step, outcome, executed_by, comment, created_at)
+      INSERT INTO workflow_history (workflow_instance_id, from_step, to _step, outcome, executed_by, comment, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, NOW())
       RETURNING id, workflow_instance_id, from_step, to_step, outcome, executed_by, comment, created_at
       `,

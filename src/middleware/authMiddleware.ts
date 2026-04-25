@@ -1,16 +1,17 @@
-import { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import { JwtUserPayload } from '../types/authTypes';
+import { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
 
 export interface AuthenticatedRequest extends Request {
   user?: {
-    id: string;
-    email: string;
-    role: string;
-    accountId: string;
-    name: string;
-  };
+    id: string
+    name?: string
+    email?: string
+    role?: string
+    accountId?: string | null
+  }
 }
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret'
 
 export function authMiddleware(
   req: AuthenticatedRequest,
@@ -18,47 +19,52 @@ export function authMiddleware(
   next: NextFunction,
 ) {
   try {
-    const authHeader = req.headers.authorization;
+    console.log('[AUTH] Authorization =>', req.headers.authorization)
 
-    if (!authHeader) {
+    const authHeader = req.headers.authorization
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('[AUTH] token ausente ou inválido')
       return res.status(401).json({
-        success: false,
         message: 'Token não informado.',
-      });
+      })
     }
 
-    const [type, token] = authHeader.split(' ');
+    const token = authHeader.replace('Bearer ', '').trim()
 
-    if (type !== 'Bearer' || !token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token inválido.',
-      });
+    const payload = jwt.verify(token, JWT_SECRET) as {
+      sub?: string
+      id?: string
+      name?: string
+      email?: string
+      role?: string
+      accountId?: string | null
     }
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      return res.status(500).json({
-        success: false,
-        message: 'JWT_SECRET não configurado.',
-      });
-    }
-
-    const decoded = jwt.verify(token, secret) as JwtUserPayload;
+    console.log('[AUTH] payload =>', payload)
 
     req.user = {
-      id: decoded.sub,
-      email: decoded.email,
-      role: decoded.role,
-      accountId: decoded.accountId,
-      name: decoded.name,
-    };
+      id: String(payload.id ?? payload.sub ?? ''),
+      name: payload.name,
+      email: payload.email,
+      role: payload.role,
+      accountId: payload.accountId ?? null,
+    }
 
-    return next();
+    console.log('[AUTH] req.user =>', req.user)
+
+    if (!req.user.id) {
+      console.log('[AUTH] payload sem id/sub')
+      return res.status(401).json({
+        message: 'Token inválido.',
+      })
+    }
+
+    next()
   } catch (error) {
+    console.error('[AUTH] error =>', error)
     return res.status(401).json({
-      success: false,
-      message: 'Não autorizado.',
-    });
+      message: 'Token inválido ou expirado.',
+    })
   }
 }

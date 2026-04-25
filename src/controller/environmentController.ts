@@ -1,17 +1,59 @@
-import { Response } from 'express';
-import db from '../config/database';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { Response } from 'express'
+import db from '../config/database'
+import { AuthenticatedRequest } from '../middleware/authMiddleware'
+
+type ResolveAccountIdResult =
+  | {
+      ok: true
+      accountId: string
+    }
+  | {
+      ok: false
+      status: number
+      body: {
+        success: false
+        message: string
+      }
+    }
+
+function resolveAccountId(req: AuthenticatedRequest): ResolveAccountIdResult {
+  const routeAccountId = req.params.accountId
+  const userAccountId = req.user?.accountId
+
+  if (!userAccountId) {
+    return {
+      ok: false,
+      status: 401,
+      body: {
+        success: false,
+        message: 'Usuário não autenticado.',
+      },
+    }
+  }
+
+  if (routeAccountId && routeAccountId !== userAccountId) {
+    return {
+      ok: false,
+      status: 403,
+      body: {
+        success: false,
+        message: 'Você não tem permissão para acessar outra organização.',
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    accountId: routeAccountId || userAccountId,
+  }
+}
 
 async function get(req: AuthenticatedRequest, res: Response) {
   try {
-    // Garante que só acessa as próprias configurações
-    const accountId = req.user?.accountId;
+    const resolved = resolveAccountId(req)
 
-    if (!accountId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuário não autenticado.',
-      });
+    if (!resolved.ok) {
+      return res.status(resolved.status).json(resolved.body)
     }
 
     const result = await db.query(
@@ -30,30 +72,46 @@ async function get(req: AuthenticatedRequest, res: Response) {
       WHERE account_id = $1
       LIMIT 1
       `,
-      [accountId],
-    );
+      [resolved.accountId],
+    )
 
-    return res.json(result.rows[0] ?? null);
+    const row = result.rows[0]
+
+    if (!row) {
+      return res.json(null)
+    }
+
+    return res.json({
+      id: row.id,
+      accountId: row.account_id,
+      revision: row.revision ?? {},
+      creationMode: row.creation_mode ?? {},
+      codingRule: row.coding_rule ?? {},
+      sequential: row.sequential ?? {},
+      deadlines: row.deadlines ?? {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })
   } catch (error: any) {
+    console.error('[ENVIRONMENT][GET] error =>', error)
+
     return res.status(500).json({
       success: false,
       message: 'Erro ao obter configurações do ambiente.',
       error: error.message,
-    });
+    })
   }
 }
 
 async function save(req: AuthenticatedRequest, res: Response) {
   try {
-    const accountId = req.user?.accountId;
-    const body = req.body ?? {};
+    const resolved = resolveAccountId(req)
 
-    if (!accountId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuário não autenticado.',
-      });
+    if (!resolved.ok) {
+      return res.status(resolved.status).json(resolved.body)
     }
+
+    const body = req.body ?? {}
 
     const result = await db.query(
       `
@@ -86,35 +144,49 @@ async function save(req: AuthenticatedRequest, res: Response) {
         updated_at
       `,
       [
-        accountId,
+        resolved.accountId,
         JSON.stringify(body.revision ?? {}),
         JSON.stringify(body.creationMode ?? {}),
         JSON.stringify(body.codingRule ?? {}),
         JSON.stringify(body.sequential ?? {}),
         JSON.stringify(body.deadlines ?? {}),
       ],
-    );
+    )
 
-    return res.json(result.rows[0]);
+    const row = result.rows[0]
+
+    return res.json({
+      id: row.id,
+      accountId: row.account_id,
+      revision: row.revision ?? {},
+      creationMode: row.creation_mode ?? {},
+      codingRule: row.coding_rule ?? {},
+      sequential: row.sequential ?? {},
+      deadlines: row.deadlines ?? {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })
   } catch (error: any) {
+    console.error('[ENVIRONMENT][SAVE] error =>', error)
+
     return res.status(500).json({
       success: false,
       message: 'Erro ao salvar configurações do ambiente.',
       error: error.message,
-    });
+    })
   }
 }
 
 async function update(req: AuthenticatedRequest, res: Response) {
-  return save(req, res);
+  return save(req, res)
 }
 
 async function getAlt(req: AuthenticatedRequest, res: Response) {
-  return get(req, res);
+  return get(req, res)
 }
 
 async function saveAlt(req: AuthenticatedRequest, res: Response) {
-  return save(req, res);
+  return save(req, res)
 }
 
 export default {
@@ -123,4 +195,4 @@ export default {
   update,
   getAlt,
   saveAlt,
-};
+}

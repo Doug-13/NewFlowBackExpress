@@ -1,504 +1,651 @@
-import { Response } from 'express';
-import bcrypt from 'bcrypt';
-import db from '../config/database';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { Response } from 'express'
+import bcrypt from 'bcryptjs'
+import pool from '../config/database'
+import type { AuthenticatedRequest } from '../middleware/authMiddleware'
 
-function normalizeUser(item: any) {
-  if (!item) return item;
+type UserRow = {
+  id: string
+  account_id?: string | null
+  name: string
+  email: string
+  password_hash?: string
+  role: string
+  cpf?: string | null
+  phone?: string | null
+  photo_url?: string | null
+  department?: string | null
+  job_title?: string | null
+  position?: string | null
+  notes?: string | null
+  is_active?: boolean
+  created_at?: string
+  updated_at?: string
+}
 
+function normalizeUser(row: UserRow) {
   return {
-    ...item,
-    accountId: item.account_id ?? item.accountId,
-    photoUrl: item.photo_url ?? item.photoUrl ?? null,
-    jobTitle: item.job_title ?? item.jobTitle ?? null,
-    isActive: item.is_active ?? item.isActive ?? true,
-    createdAt: item.created_at ?? item.createdAt,
-    updatedAt: item.updated_at ?? item.updatedAt,
-    password: undefined,
-    password_hash: undefined,
-  };
-}
-
-function normalizeMembership(item: any) {
-  if (!item) return item;
-
-  return {
-    ...item,
-    userId: item.user_id ?? item.userId,
-    accountId: item.account_id ?? item.accountId,
-    processId: item.process_id ?? item.processId,
-    isActive: item.is_active ?? item.isActive ?? true,
-    createdAt: item.created_at ?? item.createdAt,
-    updatedAt: item.updated_at ?? item.updatedAt,
-  };
-}
-
-function isValidUuid(value?: string | null) {
-  if (!value) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-async function findAll(req: AuthenticatedRequest, res: Response) {
-  try {
-    const accountId = req.user?.accountId;
-
-    const result = await db.query(
-      `
-      SELECT
-        id,
-        account_id,
-        name,
-        email,
-        role,
-        cpf,
-        phone,
-        photo_url,
-        department,
-        job_title,
-        position,
-        is_active,
-        notes,
-        created_at,
-        updated_at
-      FROM users
-      WHERE account_id = $1
-      ORDER BY created_at DESC
-      `,
-      [accountId],
-    );
-
-    return res.json(result.rows.map(normalizeUser));
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao listar usuários.',
-      error: error.message,
-    });
+    id: row.id,
+    accountId: row.account_id ?? null,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    cpf: row.cpf ?? undefined,
+    phone: row.phone ?? undefined,
+    photoUrl: row.photo_url ?? undefined,
+    department: row.department ?? undefined,
+    jobTitle: row.job_title ?? undefined,
+    position: row.position ?? undefined,
+    isActive: row.is_active ?? true,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at ?? undefined,
+    updatedAt: row.updated_at ?? undefined,
   }
 }
 
-async function findOne(req: AuthenticatedRequest, res: Response) {
-  try {
-    const { id } = req.params;
+const usersController = {
+  async findAll(req: AuthenticatedRequest, res: Response) {
+    try {
+      const accountId = req.user?.accountId
 
-    if (!isValidUuid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: `Usuário ${id} não encontrado`,
-      });
-    }
+      if (!accountId) {
+        return res.status(401).json({
+          message: 'Usuário não autenticado.',
+        })
+      }
 
-    const result = await db.query(
-      `
-      SELECT
-        id,
-        account_id,
-        name,
-        email,
-        role,
-        cpf,
-        phone,
-        photo_url,
-        department,
-        job_title,
-        position,
-        is_active,
-        notes,
-        created_at,
-        updated_at
-      FROM users
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [id],
-    );
-
-    const item = result.rows[0];
-
-    if (!item) {
-      return res.status(404).json({
-        success: false,
-        message: `Usuário ${id} não encontrado`,
-      });
-    }
-
-    return res.json(normalizeUser(item));
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao buscar usuário.',
-      error: error.message,
-    });
-  }
-}
-
-async function create(req: AuthenticatedRequest, res: Response) {
-  try {
-    const dto = req.body ?? {};
-    const accountId = req.user?.accountId;
-
-    const existing = await db.query(
-      `
-      SELECT id
-      FROM users
-      WHERE email = $1
-      LIMIT 1
-      `,
-      [dto.email],
-    );
-
-    if (existing.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `E-mail "${dto.email}" já está cadastrado`,
-      });
-    }
-
-    const rawPassword = String(dto.password ?? '').trim() || 'changeme';
-    const passwordHash = await bcrypt.hash(rawPassword, 10);
-
-    const result = await db.query(
-      `
-      INSERT INTO users (
-        account_id,
-        name,
-        email,
-        password_hash,
-        role,
-        cpf,
-        phone,
-        photo_url,
-        department,
-        job_title,
-        position,
-        is_active,
-        notes
+      const result = await pool.query(
+        `
+        SELECT
+          id,
+          account_id,
+          name,
+          email,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        FROM users
+        WHERE account_id = $1
+        ORDER BY name ASC
+        `,
+        [accountId],
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING
-        id,
-        account_id,
-        name,
-        email,
-        role,
-        cpf,
-        phone,
-        photo_url,
-        department,
-        job_title,
-        position,
-        is_active,
-        notes,
-        created_at,
-        updated_at
-      `,
-      [
-        accountId,
-        dto.name,
-        dto.email,
-        passwordHash,
-        dto.role ?? 'user',
-        dto.cpf ?? null,
-        dto.phone ?? null,
-        dto.photoUrl ?? null,
-        dto.department ?? null,
-        dto.jobTitle ?? null,
-        dto.position ?? null,
-        dto.isActive ?? true,
-        dto.notes ?? null,
-      ],
-    );
 
-    return res.status(201).json(normalizeUser(result.rows[0]));
-  } catch (error: any) {
-    if (error?.code === '23505') {
-      return res.status(400).json({
-        success: false,
-        message: 'E-mail já está em uso por outro usuário',
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao criar usuário.',
-      error: error.message,
-    });
-  }
-}
-
-async function update(req: AuthenticatedRequest, res: Response) {
-  try {
-    const { id } = req.params;
-    const dto = req.body ?? {};
-
-    if (!isValidUuid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: `Usuário ${id} não encontrado`,
-      });
-    }
-
-    const currentResult = await db.query(
-      `
-      SELECT *
-      FROM users
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [id],
-    );
-
-    const current = currentResult.rows[0];
-
-    if (!current) {
-      return res.status(404).json({
-        success: false,
-        message: `Usuário ${id} não encontrado`,
-      });
-    }
-
-    let passwordHash = current.password_hash;
-    if (typeof dto.password === 'string' && dto.password.trim()) {
-      passwordHash = await bcrypt.hash(dto.password.trim(), 10);
-    }
-
-    const result = await db.query(
-      `
-      UPDATE users
-      SET
-        name = $1,
-        email = $2,
-        password_hash = $3,
-        role = $4,
-        cpf = $5,
-        phone = $6,
-        photo_url = $7,
-        department = $8,
-        job_title = $9,
-        position = $10,
-        is_active = $11,
-        notes = $12,
-        updated_at = NOW()
-      WHERE id = $13
-      RETURNING
-        id,
-        account_id,
-        name,
-        email,
-        role,
-        cpf,
-        phone,
-        photo_url,
-        department,
-        job_title,
-        position,
-        is_active,
-        notes,
-        created_at,
-        updated_at
-      `,
-      [
-        dto.name ?? current.name,
-        dto.email ?? current.email,
-        passwordHash,
-        dto.role ?? current.role,
-        dto.cpf !== undefined ? dto.cpf : current.cpf,
-        dto.phone !== undefined ? dto.phone : current.phone,
-        dto.photoUrl !== undefined ? dto.photoUrl : current.photo_url,
-        dto.department !== undefined ? dto.department : current.department,
-        dto.jobTitle !== undefined ? dto.jobTitle : current.job_title,
-        dto.position !== undefined ? dto.position : current.position,
-        dto.isActive !== undefined ? Boolean(dto.isActive) : current.is_active,
-        dto.notes !== undefined ? dto.notes : current.notes,
-        id,
-      ],
-    );
-
-    return res.json(normalizeUser(result.rows[0]));
-  } catch (error: any) {
-    if (error?.code === '23505') {
-      return res.status(400).json({
-        success: false,
-        message: 'E-mail já está em uso por outro usuário',
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao atualizar usuário.',
-      error: error.message,
-    });
-  }
-}
-
-async function patch(req: AuthenticatedRequest, res: Response) {
-  return update(req, res);
-}
-
-async function remove(req: AuthenticatedRequest, res: Response) {
-  try {
-    const { id } = req.params;
-
-    await db.query(
-      `
-      DELETE FROM users
-      WHERE id = $1
-      `,
-      [id],
-    );
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao remover usuário.',
-      error: error.message,
-    });
-  }
-}
-
-async function getMemberships(req: AuthenticatedRequest, res: Response) {
-  try {
-    const q: any = req.query ?? {};
-    const accountId = req.user?.accountId;
-    const userId = q.userId ? String(q.userId) : null;
-    const processId = q.processId ? String(q.processId) : null;
-
-    const conditions = ['account_id = $1'];
-    const params: any[] = [accountId];
-
-    if (userId) {
-      params.push(userId);
-      conditions.push(`user_id = $${params.length}`);
-    }
-
-    if (processId) {
-      params.push(processId);
-      conditions.push(`process_id = $${params.length}`);
-    }
-
-    const result = await db.query(
-      `
-      SELECT
-        id,
-        user_id,
-        account_id,
-        process_id,
-        role,
-        is_active,
-        created_at,
-        updated_at
-      FROM user_process_memberships
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY created_at DESC
-      `,
-      params,
-    );
-
-    return res.json(result.rows.map(normalizeMembership));
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao listar memberships.',
-      error: error.message,
-    });
-  }
-}
-
-async function getMembershipsAlt(req: AuthenticatedRequest, res: Response) {
-  return getMemberships(req, res);
-}
-
-async function createMembership(req: AuthenticatedRequest, res: Response) {
-  try {
-    const body = req.body ?? {};
-    const accountId = req.user?.accountId;
-
-    const result = await db.query(
-      `
-      INSERT INTO user_process_memberships (
-        user_id,
-        account_id,
-        process_id,
-        role,
-        is_active
+      return res.status(200).json(
+        result.rows.map((row) => normalizeUser(row as UserRow)),
       )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING
-        id,
-        user_id,
-        account_id,
-        process_id,
-        role,
-        is_active,
-        created_at,
-        updated_at
-      `,
-      [
-        body.userId,
+    } catch (error) {
+      console.error('[USERS][FIND_ALL] error =>', error)
+      return res.status(500).json({
+        message: 'Erro ao buscar usuários.',
+      })
+    }
+  },
+
+  async findOne(req: AuthenticatedRequest, res: Response) {
+    try {
+      const accountId = req.user?.accountId
+      const { id } = req.params
+
+      if (!accountId) {
+        return res.status(401).json({
+          message: 'Usuário não autenticado.',
+        })
+      }
+
+      const result = await pool.query(
+        `
+        SELECT
+          id,
+          account_id,
+          name,
+          email,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        FROM users
+        WHERE id = $1
+          AND account_id = $2
+        LIMIT 1
+        `,
+        [id, accountId],
+      )
+
+      const user = result.rows[0] as UserRow | undefined
+
+      if (!user) {
+        return res.status(404).json({
+          message: 'Usuário não encontrado.',
+        })
+      }
+
+      return res.status(200).json(normalizeUser(user))
+    } catch (error) {
+      console.error('[USERS][FIND_ONE] error =>', error)
+      return res.status(500).json({
+        message: 'Erro ao buscar usuário.',
+      })
+    }
+  },
+
+  async create(req: AuthenticatedRequest, res: Response) {
+    try {
+      const userAccountId = req.user?.accountId
+
+      if (!userAccountId) {
+        return res.status(401).json({
+          message: 'Usuário não autenticado.',
+        })
+      }
+
+      const {
         accountId,
-        body.processId,
-        body.role ?? 'member',
-        true,
-      ],
-    );
-
-    return res.status(201).json(normalizeMembership(result.rows[0]));
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao criar membership.',
-      error: error.message,
-    });
-  }
-}
-
-async function getAccountMemberships(req: AuthenticatedRequest, res: Response) {
-  try {
-    const accountId = req.user?.accountId;
-
-    const result = await db.query(
-      `
-      SELECT
-        id,
-        user_id,
-        account_id,
-        process_id,
+        name,
+        email,
+        password,
         role,
-        is_active,
-        created_at,
-        updated_at
-      FROM user_process_memberships
-      WHERE account_id = $1
-      ORDER BY created_at DESC
-      `,
-      [accountId],
-    );
+        cpf,
+        phone,
+        photoUrl,
+        department,
+        jobTitle,
+        position,
+        notes,
+        isActive,
+      } = req.body as {
+        accountId?: string
+        name?: string
+        email?: string
+        password?: string
+        role?: string
+        cpf?: string
+        phone?: string
+        photoUrl?: string
+        department?: string
+        jobTitle?: string
+        position?: string
+        notes?: string
+        isActive?: boolean
+      }
 
-    return res.json(result.rows.map(normalizeMembership));
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao listar memberships da conta.',
-      error: error.message,
-    });
-  }
+      if (accountId && accountId !== userAccountId) {
+        return res.status(403).json({
+          message: 'Você não pode criar usuário em outra organização.',
+        })
+      }
+
+      if (!name || !email || !password || !role) {
+        return res.status(400).json({
+          message: 'accountId, name, email, password e role são obrigatórios.',
+        })
+      }
+
+      const existingResult = await pool.query(
+        `
+        SELECT id
+        FROM users
+        WHERE email = $1
+        LIMIT 1
+        `,
+        [email],
+      )
+
+      if (existingResult.rows.length > 0) {
+        return res.status(409).json({
+          message: 'Já existe um usuário com este e-mail.',
+        })
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10)
+
+      const result = await pool.query(
+        `
+        INSERT INTO users (
+          account_id,
+          name,
+          email,
+          password_hash,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11, $12,
+          $13, NOW(), NOW()
+        )
+        RETURNING
+          id,
+          account_id,
+          name,
+          email,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        `,
+        [
+          userAccountId,
+          name,
+          email,
+          hashedPassword,
+          role,
+          cpf ?? null,
+          phone ?? null,
+          photoUrl ?? null,
+          department ?? null,
+          jobTitle ?? null,
+          position ?? null,
+          notes ?? null,
+          typeof isActive === 'boolean' ? isActive : true,
+        ],
+      )
+
+      return res.status(201).json(
+        normalizeUser(result.rows[0] as UserRow),
+      )
+    } catch (error) {
+      console.error('[USERS][CREATE] error =>', error)
+      return res.status(500).json({
+        message: 'Erro ao criar usuário.',
+      })
+    }
+  },
+
+  async update(req: AuthenticatedRequest, res: Response) {
+    try {
+      const accountId = req.user?.accountId
+      const { id } = req.params
+
+      if (!accountId) {
+        return res.status(401).json({
+          message: 'Usuário não autenticado.',
+        })
+      }
+
+      const {
+        name,
+        email,
+        password,
+        role,
+        cpf,
+        phone,
+        photoUrl,
+        department,
+        jobTitle,
+        position,
+        notes,
+        isActive,
+      } = req.body as {
+        name?: string
+        email?: string
+        password?: string
+        role?: string
+        cpf?: string
+        phone?: string
+        photoUrl?: string
+        department?: string
+        jobTitle?: string
+        position?: string
+        notes?: string
+        isActive?: boolean
+      }
+
+      if (!name || !email || !role) {
+        return res.status(400).json({
+          message: 'name, email e role são obrigatórios.',
+        })
+      }
+
+      const currentResult = await pool.query(
+        `
+        SELECT
+          id,
+          account_id,
+          password_hash
+        FROM users
+        WHERE id = $1
+          AND account_id = $2
+        LIMIT 1
+        `,
+        [id, accountId],
+      )
+
+      const currentUser = currentResult.rows[0] as UserRow | undefined
+
+      if (!currentUser) {
+        return res.status(404).json({
+          message: 'Usuário não encontrado.',
+        })
+      }
+
+      const duplicateResult = await pool.query(
+        `
+        SELECT id
+        FROM users
+        WHERE email = $1
+          AND id <> $2
+        LIMIT 1
+        `,
+        [email, id],
+      )
+
+      if (duplicateResult.rows.length > 0) {
+        return res.status(409).json({
+          message: 'Já existe outro usuário com este e-mail.',
+        })
+      }
+
+      let passwordHash = currentUser.password_hash ?? ''
+
+      if (password && password.trim()) {
+        passwordHash = await bcrypt.hash(password, 10)
+      }
+
+      const result = await pool.query(
+        `
+        UPDATE users
+        SET
+          name = $1,
+          email = $2,
+          password_hash = $3,
+          role = $4,
+          cpf = $5,
+          phone = $6,
+          photo_url = $7,
+          department = $8,
+          job_title = $9,
+          position = $10,
+          notes = $11,
+          is_active = $12,
+          updated_at = NOW()
+        WHERE id = $13
+          AND account_id = $14
+        RETURNING
+          id,
+          account_id,
+          name,
+          email,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        `,
+        [
+          name,
+          email,
+          passwordHash,
+          role,
+          cpf ?? null,
+          phone ?? null,
+          photoUrl ?? null,
+          department ?? null,
+          jobTitle ?? null,
+          position ?? null,
+          notes ?? null,
+          typeof isActive === 'boolean' ? isActive : true,
+          id,
+          accountId,
+        ],
+      )
+
+      return res.status(200).json(
+        normalizeUser(result.rows[0] as UserRow),
+      )
+    } catch (error) {
+      console.error('[USERS][UPDATE] error =>', error)
+      return res.status(500).json({
+        message: 'Erro ao atualizar usuário.',
+      })
+    }
+  },
+
+  async patch(req: AuthenticatedRequest, res: Response) {
+    try {
+      const accountId = req.user?.accountId
+      const { id } = req.params
+      const payload = req.body as {
+        name?: string
+        email?: string
+        password?: string
+        role?: string
+        cpf?: string
+        phone?: string
+        photoUrl?: string
+        department?: string
+        jobTitle?: string
+        position?: string
+        notes?: string
+        isActive?: boolean
+      }
+
+      if (!accountId) {
+        return res.status(401).json({
+          message: 'Usuário não autenticado.',
+        })
+      }
+
+      const currentResult = await pool.query(
+        `
+        SELECT
+          id,
+          account_id,
+          name,
+          email,
+          password_hash,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active
+        FROM users
+        WHERE id = $1
+          AND account_id = $2
+        LIMIT 1
+        `,
+        [id, accountId],
+      )
+
+      const currentUser = currentResult.rows[0] as UserRow | undefined
+
+      if (!currentUser) {
+        return res.status(404).json({
+          message: 'Usuário não encontrado.',
+        })
+      }
+
+      const nextEmail = payload.email ?? currentUser.email
+
+      if (payload.email) {
+        const duplicateResult = await pool.query(
+          `
+          SELECT id
+          FROM users
+          WHERE email = $1
+            AND id <> $2
+          LIMIT 1
+          `,
+          [payload.email, id],
+        )
+
+        if (duplicateResult.rows.length > 0) {
+          return res.status(409).json({
+            message: 'Já existe outro usuário com este e-mail.',
+          })
+        }
+      }
+
+      let nextPasswordHash = currentUser.password_hash ?? ''
+
+      if (payload.password && payload.password.trim()) {
+        nextPasswordHash = await bcrypt.hash(payload.password, 10)
+      }
+
+      const result = await pool.query(
+        `
+        UPDATE users
+        SET
+          name = $1,
+          email = $2,
+          password_hash = $3,
+          role = $4,
+          cpf = $5,
+          phone = $6,
+          photo_url = $7,
+          department = $8,
+          job_title = $9,
+          position = $10,
+          notes = $11,
+          is_active = $12,
+          updated_at = NOW()
+        WHERE id = $13
+          AND account_id = $14
+        RETURNING
+          id,
+          account_id,
+          name,
+          email,
+          role,
+          cpf,
+          phone,
+          photo_url,
+          department,
+          job_title,
+          position,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        `,
+        [
+          payload.name ?? currentUser.name,
+          nextEmail,
+          nextPasswordHash,
+          payload.role ?? currentUser.role,
+          payload.cpf ?? currentUser.cpf ?? null,
+          payload.phone ?? currentUser.phone ?? null,
+          payload.photoUrl ?? currentUser.photo_url ?? null,
+          payload.department ?? currentUser.department ?? null,
+          payload.jobTitle ?? currentUser.job_title ?? null,
+          payload.position ?? currentUser.position ?? null,
+          payload.notes ?? currentUser.notes ?? null,
+          typeof payload.isActive === 'boolean'
+            ? payload.isActive
+            : (currentUser.is_active ?? true),
+          id,
+          accountId,
+        ],
+      )
+
+      return res.status(200).json(
+        normalizeUser(result.rows[0] as UserRow),
+      )
+    } catch (error) {
+      console.error('[USERS][PATCH] error =>', error)
+      return res.status(500).json({
+        message: 'Erro ao atualizar parcialmente o usuário.',
+      })
+    }
+  },
+
+  async remove(req: AuthenticatedRequest, res: Response) {
+    try {
+      const accountId = req.user?.accountId
+      const { id } = req.params
+
+      if (!accountId) {
+        return res.status(401).json({
+          message: 'Usuário não autenticado.',
+        })
+      }
+
+      const result = await pool.query(
+        `
+        DELETE FROM users
+        WHERE id = $1
+          AND account_id = $2
+        RETURNING id
+        `,
+        [id, accountId],
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: 'Usuário não encontrado.',
+        })
+      }
+
+      return res.status(200).json({
+        message: 'Usuário removido com sucesso.',
+      })
+    } catch (error) {
+      console.error('[USERS][REMOVE] error =>', error)
+      return res.status(500).json({
+        message: 'Erro ao remover usuário.',
+      })
+    }
+  },
+
+  async getMemberships(_req: AuthenticatedRequest, res: Response) {
+    return res.status(200).json([])
+  },
+
+  async getMembershipsAlt(req: AuthenticatedRequest, res: Response) {
+    return usersController.getMemberships(req, res)
+  },
+
+  async createMembership(_req: AuthenticatedRequest, res: Response) {
+    return res.status(201).json({})
+  },
+
+  async getAccountMemberships(_req: AuthenticatedRequest, res: Response) {
+    return res.status(200).json([])
+  },
+
+  async getAccountMembershipsAlt(req: AuthenticatedRequest, res: Response) {
+    return usersController.getAccountMemberships(req, res)
+  },
 }
 
-async function getAccountMembershipsAlt(req: AuthenticatedRequest, res: Response) {
-  return getAccountMemberships(req, res);
-}
-
-export default {
-  findAll,
-  findOne,
-  create,
-  update,
-  patch,
-  remove,
-  getMemberships,
-  getMembershipsAlt,
-  createMembership,
-  getAccountMemberships,
-  getAccountMembershipsAlt,
-};
+export default usersController
